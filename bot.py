@@ -1,61 +1,71 @@
 import discord
+import asyncio
 from discord.ext import commands
-import sqlite3
-from datetime import datetime, timedelta
 import os
 
-# Setup bot with intents
-intents = discord.Intents.default()
-intents.members = True
+TOKEN = os.getenv("TOKEN")  # Get token from Railway environment variables
+GUILD_ID = int(os.getenv("GUILD_ID"))  # Your main server ID
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))  # Log channel ID
+APPEAL_SERVER_INVITE = os.getenv("APPEAL_SERVER_INVITE")  # Appeal server invite link
+
+intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Connect to SQLite database
-conn = sqlite3.connect("members.db")
-cursor = conn.cursor()
-cursor.execute("CREATE TABLE IF NOT EXISTS members (user_id INTEGER, join_date TEXT)")
-conn.commit()
+join_times = {}
 
-APPEAL_SERVER_LINK = "https://discord.gg/6Sk9gpbAv2"  # Replace with your actual appeal server link
-
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
-
+# ✅ Track when users join
 @bot.event
 async def on_member_join(member):
-    # Assign "Member" role
-    role = discord.utils.get(member.guild.roles, name="Member")
-    if role:
-        await member.add_roles(role)
+    join_times[member.id] = member.joined_at.timestamp()
 
-    # Save join date
-    cursor.execute("INSERT OR REPLACE INTO members (user_id, join_date) VALUES (?, ?)", 
-                   (member.id, datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")))
-    conn.commit()
-
+# ✅ Auto-ban users who leave before 30 days
 @bot.event
 async def on_member_remove(member):
-    # Get join date
-    cursor.execute("SELECT join_date FROM members WHERE user_id = ?", (member.id,))
-    result = cursor.fetchone()
-
-    if result:
-        join_date = datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S")
-        if datetime.utcnow() - join_date < timedelta(days=30):
-            # Ban the user if they leave before 30 days
-            guild = member.guild
-            await guild.ban(member, reason="Left before 30 days. Appeal in our appeal server.")
-
-            # Attempt to DM the banned user
+    if member.id in join_times:
+        time_joined = join_times[member.id]
+        time_now = asyncio.get_event_loop().time()
+        days_in_server = (time_now - time_joined) / 86400  # Convert seconds to days
+        
+        if days_in_server < 30:
+            guild = bot.get_guild(GUILD_ID)
+            await guild.ban(member, reason="Left before 30 days")
+            
+            # Send DM to banned user
             try:
-                await member.send(f"You have been banned for leaving before 30 days.\n"
-                                  f"If you wish to appeal, please join our appeal server: {APPEAL_SERVER_LINK}")
-            except discord.Forbidden:
-                print(f"Could not DM {member.name} about their ban.")
+                dm_message = f"You have been banned from {guild.name} for leaving before 30 days.\n"
+                dm_message += f"If you believe this was a mistake, you can appeal here: {APPEAL_SERVER_INVITE}"
+                await member.send(dm_message)
+            except:
+                pass  # Ignore errors if the user has DMs off
+            
+            # Log the ban
+            log_channel = bot.get_channel(LOG_CHANNEL_ID)
+            if log_channel:
+                await log_channel.send(f"🚨 {member.mention} was banned for leaving before 30 days.")
 
-    # Remove user from database
-    cursor.execute("DELETE FROM members WHERE user_id = ?", (member.id,))
-    conn.commit()
+# ✅ Unban command (Admins Only)
+@bot.command()
+async def unban(ctx, user_id: int):
+    admin_users = ["Secret#0000", "Deiman#0000"]  # Only these users can unban
+    if str(ctx.author) not in admin_users:
+        await ctx.send("❌ You are not allowed to use this command.")
+        return
+    
+    guild = bot.get_guild(GUILD_ID)
+    user = await bot.fetch_user(user_id)
+    await guild.unban(user)
+    
+    # Send DM to unbanned user
+    try:
+        await user.send(f"✅ You have been unbanned from {guild.name}. You may rejoin now.")
+    except:
+        pass  # Ignore errors if user has DMs off
+    
+    # Log the unban
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+    if log_channel:
+        await log_channel.send(f"✅ {user.mention} has been unbanned by {ctx.author.mention}.")
 
-# Start the bot using a hidden token
-bot.run(os.getenv("DISCORD_BOT_TOKEN"))
+    await ctx.send(f"✅ {user.mention} has been unbanned.")
+
+bot.run(TOKEN)
