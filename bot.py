@@ -13,6 +13,13 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 join_times = {}
 
+# ✅ Bot Ready Event
+@bot.event
+async def on_ready():
+    print(f"✅ {bot.user} is now online!")
+    for guild in bot.guilds:
+        print(f"Connected to: {guild.name} (ID: {guild.id})")
+
 # ✅ Track when users join
 @bot.event
 async def on_member_join(member):
@@ -46,7 +53,7 @@ async def on_member_remove(member):
 # ✅ Unban command (Admins Only)
 @bot.command()
 async def unban(ctx, user_id: int):
-    admin_users = ["Secret#0000", "Deiman#0000"]  # Only these users can unban
+    admin_users = ["secret_was_here", "deiman9000"]  # Correct usernames
     if str(ctx.author) not in admin_users:
         await ctx.send("❌ You are not allowed to use this command.")
         return
@@ -68,4 +75,5 @@ async def unban(ctx, user_id: int):
 
     await ctx.send(f"✅ {user.mention} has been unbanned.")
 
+# Run the bot
 bot.run(TOKEN)
