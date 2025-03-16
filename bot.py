@@ -45,14 +45,21 @@ async def on_member_remove(member):
             if log_channel:
                 await log_channel.send(f"🚨 {member.mention} was banned for leaving before 30 days.")
 
+# ✅ Test Command: Check Your Discord ID
+@bot.command()
+async def myid(ctx):
+    await ctx.send(f"Your Discord ID is: `{ctx.author.id}`")
+
 # ✅ Unban command (Admins Only - Restricted to Specific Users)
 @bot.command()
 async def unban(ctx, user_id: int):
-    allowed_admins = [984152481225404467, 944332591404826645]  # Allowed Discord User IDs
+    allowed_admins = [984152481225404467, 944332591404826645]  # Your Correct Discord User IDs
+
+    print(f"🔍 Command used by: {ctx.author.id}")  # Debugging
 
     # Check if the command user is in the allowed list
     if ctx.author.id not in allowed_admins:
-        await ctx.send("❌ You are not allowed to use this command.")
+        await ctx.send(f"❌ You are not allowed to use this command. Your ID: `{ctx.author.id}`")
         return
 
     guild = bot.get_guild(GUILD_ID)
@@ -61,10 +68,7 @@ async def unban(ctx, user_id: int):
         return
 
     try:
-        # Debugging: Print fetch attempt
-        print(f"Fetching ban list for {guild.name}...")
-
-        # Fetch ban list to check if the user is actually banned
+        print(f"Fetching ban list for {guild.name}...")  # Debugging
         banned_users = await guild.bans()
         user = discord.utils.get(banned_users, user__id=user_id)
 
@@ -72,13 +76,11 @@ async def unban(ctx, user_id: int):
             await guild.unban(user.user)
             await ctx.send(f"✅ {user.user.mention} has been unbanned.")
 
-            # Send DM to the unbanned user
             try:
                 await user.user.send(f"✅ You have been unbanned from {guild.name}. You may rejoin now.")
             except:
                 pass  # Ignore errors if DMs are off
 
-            # Log the unban
             log_channel = bot.get_channel(LOG_CHANNEL_ID)
             if log_channel:
                 await log_channel.send(f"✅ {user.user.mention} has been unbanned by {ctx.author.mention}.")
