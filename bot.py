@@ -11,7 +11,7 @@ APPEAL_SERVER_INVITE = os.getenv("APPEAL_SERVER_INVITE")  # Appeal server invite
 intents = discord.Intents.all()
 
 # ✅ Set Prefix to "!"
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 join_times = {}
 
@@ -19,6 +19,13 @@ join_times = {}
 @bot.event
 async def on_ready():
     print(f"✅ {bot.user} is now online!")
+    print("🔄 Syncing commands...")
+
+    try:
+        await bot.tree.sync()
+        print("✅ Commands synced successfully!")
+    except Exception as e:
+        print(f"❌ Command sync failed: {e}")
 
 # ✅ Auto-ban users who leave before 30 days
 @bot.event
@@ -93,6 +100,14 @@ async def unban(ctx, user_id: int):
         await ctx.send(f"⚠️ Discord API Error: {e}")
     except Exception as e:
         await ctx.send(f"⚠️ Unexpected Error: {e}")
+
+# ✅ Error Handling - Tell Users If a Command Fails
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        await ctx.send("❌ Command not found! Use `!help` to see available commands.")
+    else:
+        raise error
 
 # Run the bot
 bot.run(TOKEN)
