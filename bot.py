@@ -10,7 +10,7 @@ APPEAL_SERVER_INVITE = os.getenv("APPEAL_SERVER_INVITE")  # Appeal server invite
 
 intents = discord.Intents.all()
 
-# ✅ Set Prefix to "!"
+# ✅ Set bot with fixed prefix "!"
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 join_times = {}
@@ -19,13 +19,6 @@ join_times = {}
 @bot.event
 async def on_ready():
     print(f"✅ {bot.user} is now online!")
-    print("🔄 Syncing commands...")
-
-    try:
-        await bot.tree.sync()
-        print("✅ Commands synced successfully!")
-    except Exception as e:
-        print(f"❌ Command sync failed: {e}")
 
 # ✅ Auto-ban users who leave before 30 days
 @bot.event
@@ -52,62 +45,35 @@ async def on_member_remove(member):
             if log_channel:
                 await log_channel.send(f"🚨 {member.mention} was banned for leaving before 30 days.")
 
-# ✅ Test Command: Check Your Discord ID
+# ✅ Unban command (Admins Only, Supports Mentions)
 @bot.command()
-async def myid(ctx):
-    await ctx.send(f"Your Discord ID is: `{ctx.author.id}`")
-
-# ✅ Unban command (Admins Only - Restricted to Specific Users)
-@bot.command()
-async def unban(ctx, user_id: int):
-    allowed_admins = [984152481225404467, 944332591404826645]  # Your Correct Discord User IDs
-
-    print(f"🔍 Command used by: {ctx.author.id}")  # Debugging
-
-    # Check if the command user is in the allowed list
-    if ctx.author.id not in allowed_admins:
-        await ctx.send(f"❌ You are not allowed to use this command. Your ID: `{ctx.author.id}`")
-        return
-
-    guild = bot.get_guild(GUILD_ID)
-    if not guild:
-        await ctx.send("❌ Error: Bot is not in the correct server.")
-        return
-
+@commands.has_permissions(administrator=True)  # ✅ Only admins can use it
+async def unban(ctx, user: discord.User):  # Accepts a mention or user ID
+    guild = ctx.guild  # Get the guild (server)
+    
     try:
-        print(f"Fetching ban list for {guild.name}...")  # Debugging
-        banned_users = await guild.bans()
-        user = discord.utils.get(banned_users, user__id=user_id)
+        await guild.unban(user)  # Unban the user
+        await ctx.send(f"✅ {user.mention} has been unbanned.")
 
-        if user:
-            await guild.unban(user.user)
-            await ctx.send(f"✅ {user.user.mention} has been unbanned.")
+        # ✅ DM the user (optional)
+        try:
+            await user.send(f"✅ You have been unbanned from {guild.name}. You may rejoin now.")
+        except:
+            pass  # Ignore errors if DMs are off
 
-            try:
-                await user.user.send(f"✅ You have been unbanned from {guild.name}. You may rejoin now.")
-            except:
-                pass  # Ignore errors if DMs are off
+        # ✅ Log the unban
+        log_channel = bot.get_channel(LOG_CHANNEL_ID)
+        if log_channel:
+            await log_channel.send(f"✅ {user.mention} has been unbanned by {ctx.author.mention}.")
 
-            log_channel = bot.get_channel(LOG_CHANNEL_ID)
-            if log_channel:
-                await log_channel.send(f"✅ {user.user.mention} has been unbanned by {ctx.author.mention}.")
-        else:
-            await ctx.send("❌ This user is not banned or does not exist in the ban list.")
-
+    except discord.NotFound:
+        await ctx.send("❌ This user is not banned or doesn't exist.")
     except discord.Forbidden:
-        await ctx.send("❌ I do not have permission to unban members. Please check my role settings.")
+        await ctx.send("❌ I do not have permission to unban members.")
     except discord.HTTPException as e:
         await ctx.send(f"⚠️ Discord API Error: {e}")
     except Exception as e:
         await ctx.send(f"⚠️ Unexpected Error: {e}")
 
-# ✅ Error Handling - Tell Users If a Command Fails
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandNotFound):
-        await ctx.send("❌ Command not found! Use `!help` to see available commands.")
-    else:
-        raise error
-
-# Run the bot
+# ✅ Run the bot
 bot.run(TOKEN)
