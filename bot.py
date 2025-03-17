@@ -46,7 +46,7 @@ async def on_member_remove(member):
                 embed.add_field(name="Reason", value="Left before 30 days", inline=False)
                 await log_channel.send(embed=embed)
 
-# ✅ Unban Command (Admins Only, Checks if User is Banned)
+# ✅ Unban Command (Admins Only, Improved Check)
 @bot.command()
 async def unban(ctx, user: discord.User):
     if not ctx.author.guild_permissions.administrator:
@@ -54,15 +54,14 @@ async def unban(ctx, user: discord.User):
         return
     
     guild = bot.get_guild(GUILD_ID)
-    
-    # Get ban list
-    bans = await guild.bans()
-    banned_users = [ban_entry.user.id for ban_entry in bans]
-    
-    if user.id not in banned_users:
+
+    # Check if user is actually banned
+    try:
+        ban_entry = await guild.fetch_ban(user)  # Fetch ban details
+    except discord.NotFound:
         await ctx.send(f"⚠️ {user.mention} is **not banned**.")
         return
-    
+
     # Unban the user
     await guild.unban(user)
 
@@ -81,6 +80,26 @@ async def unban(ctx, user: discord.User):
         await log_channel.send(embed=embed)
 
     await ctx.send(f"✅ {user.mention} has been unbanned.")
+
+# ✅ Error Handling
+@bot.event
+async def on_command_error(ctx, error):
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+    
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You don’t have permission to use this command.")
+    elif isinstance(error, commands.UserNotFound):
+        await ctx.send("⚠️ User not found. Please mention a valid user.")
+    else:
+        await ctx.send("⚠️ An unexpected error occurred. Please check the logs.")
+    
+    # Log the error
+    if log_channel:
+        embed = discord.Embed(title="⚠️ Command Error", color=discord.Color.orange())
+        embed.add_field(name="Error", value=str(error), inline=False)
+        embed.add_field(name="Command", value=ctx.message.content, inline=False)
+        embed.add_field(name="User", value=ctx.author.mention, inline=False)
+        await log_channel.send(embed=embed)
 
 # Run the bot
 bot.run(TOKEN)
