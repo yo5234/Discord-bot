@@ -46,22 +46,25 @@ async def on_member_remove(member):
                 embed.add_field(name="Reason", value="Left before 30 days", inline=False)
                 await log_channel.send(embed=embed)
 
-# ✅ Unban Command (Admins Only, Improved Check)
+# ✅ Unban Command (Admins Only, Checks if User is Banned)
 @bot.command()
 async def unban(ctx, user: discord.User):
     if not ctx.author.guild_permissions.administrator:
-        await ctx.send("❌ You must be an admin to use this command.")
+        embed = discord.Embed(title="❌ Permission Denied", description="You must be an **admin** to use this command.", color=discord.Color.red())
+        await ctx.send(embed=embed)
         return
     
     guild = bot.get_guild(GUILD_ID)
-
-    # Check if user is actually banned
-    try:
-        ban_entry = await guild.fetch_ban(user)  # Fetch ban details
-    except discord.NotFound:
-        await ctx.send(f"⚠️ {user.mention} is **not banned**.")
+    
+    # Get ban list
+    bans = await guild.bans()
+    banned_users = [ban_entry.user.id for ban_entry in bans]
+    
+    if user.id not in banned_users:
+        embed = discord.Embed(title="⚠️ User Not Banned", description=f"{user.mention} is **not banned**.", color=discord.Color.orange())
+        await ctx.send(embed=embed)
         return
-
+    
     # Unban the user
     await guild.unban(user)
 
@@ -79,27 +82,17 @@ async def unban(ctx, user: discord.User):
         embed.add_field(name="Unbanned By", value=ctx.author.mention, inline=False)
         await log_channel.send(embed=embed)
 
-    await ctx.send(f"✅ {user.mention} has been unbanned.")
+    embed = discord.Embed(title="✅ Unban Successful", description=f"{user.mention} has been unbanned.", color=discord.Color.green())
+    await ctx.send(embed=embed)
 
-# ✅ Error Handling
+# ✅ Ignore "Command Doesn't Exist" Errors
 @bot.event
 async def on_command_error(ctx, error):
-    log_channel = bot.get_channel(LOG_CHANNEL_ID)
-    
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don’t have permission to use this command.")
-    elif isinstance(error, commands.UserNotFound):
-        await ctx.send("⚠️ User not found. Please mention a valid user.")
+    if isinstance(error, commands.CommandNotFound):
+        return  # Ignore unknown command errors
     else:
-        await ctx.send("⚠️ An unexpected error occurred. Please check the logs.")
-    
-    # Log the error
-    if log_channel:
-        embed = discord.Embed(title="⚠️ Command Error", color=discord.Color.orange())
-        embed.add_field(name="Error", value=str(error), inline=False)
-        embed.add_field(name="Command", value=ctx.message.content, inline=False)
-        embed.add_field(name="User", value=ctx.author.mention, inline=False)
-        await log_channel.send(embed=embed)
+        embed = discord.Embed(title="⚠️ Error", description=f"An error occurred: `{error}`", color=discord.Color.orange())
+        await ctx.send(embed=embed)
 
 # Run the bot
 bot.run(TOKEN)
