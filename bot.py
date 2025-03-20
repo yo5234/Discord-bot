@@ -8,10 +8,11 @@ GUILD_ID = int(os.getenv("GUILD_ID"))
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
 APPEAL_SERVER_INVITE = os.getenv("APPEAL_SERVER_INVITE")
 
-intents = discord.Intents.all()
+intents = discord.Intents.default()
+intents.members = True  # Ensure member events are enabled
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-join_times = {}  # Store user join times
+join_times = {}  # Track user join times
 
 # ✅ Bot Ready Event
 @bot.event
@@ -22,11 +23,12 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
     join_times[member.id] = member.joined_at
+    print(f"🟢 {member} joined at {member.joined_at}")  # Debug log
 
 # ✅ Auto-ban users who leave before 30 days
 @bot.event
 async def on_member_remove(member):
-    await bot.wait_until_ready()  # Ensure bot is fully initialized
+    await bot.wait_until_ready()
 
     guild = bot.get_guild(GUILD_ID)
     if not guild:
@@ -34,37 +36,41 @@ async def on_member_remove(member):
         return
 
     if not guild.me.guild_permissions.ban_members:
-        print("⚠️ Missing 'ban_members' permission.")
+        print("⚠️ Missing 'Ban Members' permission.")
         return
 
     if member.id not in join_times:
-        print(f"⚠️ {member} not found in join_times.")
+        print(f"⚠️ {member} not found in join_times. Maybe the bot restarted?")
         return
 
     time_joined = join_times[member.id]
     days_in_server = (datetime.now(timezone.utc) - time_joined).days
+    print(f"ℹ️ {member} was in the server for {days_in_server} days.")
 
     if days_in_server < 30:
-        await guild.ban(member, reason="Left before 30 days")
-
-        # Send DM
         try:
-            embed_dm = discord.Embed(title="🚨 You Have Been Banned", color=discord.Color.red())
-            embed_dm.add_field(name="Reason", value="Left before 30 days", inline=False)
-            embed_dm.add_field(name="Appeal", value=f"[Click here]({APPEAL_SERVER_INVITE})", inline=False)
-            await member.send(embed=embed_dm)
-        except:
-            pass  # Ignore DM errors
+            await guild.ban(member, reason="Left before 30 days")
+            print(f"🚨 {member} was banned.")
 
-        # Log the ban
-        log_channel = bot.get_channel(LOG_CHANNEL_ID)
-        if log_channel:
-            embed = discord.Embed(title="🚨 Auto-Ban Triggered", color=discord.Color.red())
-            embed.add_field(name="User", value=f"{member.mention} ({member.id})", inline=False)
-            embed.add_field(name="Reason", value="Left before 30 days", inline=False)
-            await log_channel.send(embed=embed)
-        else:
-            print("⚠️ Log channel not found.")
+            # Send DM
+            try:
+                embed_dm = discord.Embed(title="🚨 You Have Been Banned", color=discord.Color.red())
+                embed_dm.add_field(name="Reason", value="Left before 30 days", inline=False)
+                embed_dm.add_field(name="Appeal", value=f"[Click here]({APPEAL_SERVER_INVITE})", inline=False)
+                await member.send(embed=embed_dm)
+            except:
+                print(f"⚠️ Couldn't send DM to {member}.")
+                pass  
+
+            # Log the ban
+            log_channel = bot.get_channel(LOG_CHANNEL_ID)
+            if log_channel:
+                embed = discord.Embed(title="🚨 Auto-Ban Triggered", color=discord.Color.red())
+                embed.add_field(name="User", value=f"{member.mention} ({member.id})", inline=False)
+                embed.add_field(name="Reason", value="Left before 30 days", inline=False)
+                await log_channel.send(embed=embed)
+        except Exception as e:
+            print(f"❌ Ban failed for {member}: {e}")
 
 # ✅ Unban Command (Admins Only)
 @bot.command()
@@ -87,6 +93,7 @@ async def unban(ctx, user: discord.User):
         return
 
     await guild.unban(user)
+    print(f"✅ {user} was unbanned.")
 
     # DM user
     try:
@@ -94,6 +101,7 @@ async def unban(ctx, user: discord.User):
         embed_dm.add_field(name="Server", value=guild.name, inline=False)
         await user.send(embed=embed_dm)
     except:
+        print(f"⚠️ Couldn't send DM to {user}.")
         pass
 
     # Log unban
