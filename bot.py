@@ -9,13 +9,21 @@ LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
 APPEAL_SERVER_INVITE = os.getenv("APPEAL_SERVER_INVITE")
 
 intents = discord.Intents.default()
-intents.members = True  # Ensure member events are enabled
+intents.members = True  # Track member join/leave events
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+join_dates = {}  # Store user join times
 
 # ✅ Bot Ready Event
 @bot.event
 async def on_ready():
     print(f"✅ {bot.user} is online!")
+
+# ✅ Track when users join
+@bot.event
+async def on_member_join(member):
+    join_dates[member.id] = datetime.now(timezone.utc)
+    print(f"📥 {member} joined. Tracking their join time.")
 
 # ✅ Auto-ban users who leave before 30 days
 @bot.event
@@ -23,27 +31,17 @@ async def on_member_remove(member):
     await bot.wait_until_ready()
 
     guild = bot.get_guild(GUILD_ID)
-    if not guild:
-        print("⚠️ Guild not found.")
+    if not guild or not guild.me.guild_permissions.ban_members:
+        print("⚠️ Missing 'Ban Members' permission or guild not found.")
         return
 
-    if not guild.me.guild_permissions.ban_members:
-        print("⚠️ Missing 'Ban Members' permission.")
+    join_time = join_dates.get(member.id)  # Get stored join date
+
+    if not join_time:
+        print(f"⚠️ No stored join date for {member}. Skipping auto-ban.")
         return
 
-    # ✅ Fetch the actual join date from Discord instead of relying on bot memory
-    try:
-        member = await guild.fetch_member(member.id)
-        time_joined = member.joined_at
-    except:
-        print(f"⚠️ Could not fetch {member.id}, assuming bot was offline when they joined.")
-        return
-
-    if not time_joined:
-        print(f"⚠️ No join date available for {member}. Skipping...")
-        return
-
-    days_in_server = (datetime.now(timezone.utc) - time_joined).days
+    days_in_server = (datetime.now(timezone.utc) - join_time).days
     print(f"ℹ️ {member} was in the server for {days_in_server} days.")
 
     if days_in_server < 30:
@@ -51,14 +49,14 @@ async def on_member_remove(member):
             await guild.ban(member, reason="Left before 30 days")
             print(f"🚨 {member} was banned.")
 
-            # DM the banned user
+            # DM banned user
             try:
                 embed_dm = discord.Embed(title="🚨 You Have Been Banned", color=discord.Color.red())
                 embed_dm.add_field(name="Reason", value="Left before 30 days", inline=False)
                 embed_dm.add_field(name="Appeal", value=f"[Click here]({APPEAL_SERVER_INVITE})", inline=False)
                 await member.send(embed=embed_dm)
             except:
-                print(f"⚠️ Couldn't send DM to {member}.")
+                print(f"⚠️ Couldn't DM {member}.")
                 pass  
 
             # Log the ban
@@ -71,7 +69,7 @@ async def on_member_remove(member):
         except Exception as e:
             print(f"❌ Ban failed for {member}: {e}")
 
-# ✅ Unban Command (Admins Only)
+# ✅ Unban Command
 @bot.command()
 async def unban(ctx, user: discord.User):
     if not ctx.author.guild_permissions.administrator:
@@ -85,7 +83,7 @@ async def unban(ctx, user: discord.User):
         return
 
     try:
-        await guild.fetch_ban(user)  # Check if the user is banned
+        await guild.fetch_ban(user)
     except discord.NotFound:
         embed = discord.Embed(title="⚠️ User Not Banned", description=f"{user.mention} is **not banned**.", color=discord.Color.orange())
         await ctx.send(embed=embed)
@@ -100,7 +98,7 @@ async def unban(ctx, user: discord.User):
         embed_dm.add_field(name="Server", value=guild.name, inline=False)
         await user.send(embed=embed_dm)
     except:
-        print(f"⚠️ Couldn't send DM to {user}.")
+        print(f"⚠️ Couldn't DM {user}.")
         pass
 
     # Log unban
@@ -118,7 +116,7 @@ async def unban(ctx, user: discord.User):
 @bot.event
 async def on_command_error(ctx, error):
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
-    
+
     if isinstance(error, commands.MissingPermissions):
         embed = discord.Embed(title="❌ Permission Denied", description="You don’t have permission to use this command.", color=discord.Color.red())
     elif isinstance(error, commands.UserNotFound):
