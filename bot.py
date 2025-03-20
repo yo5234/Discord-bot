@@ -12,18 +12,10 @@ intents = discord.Intents.default()
 intents.members = True  # Ensure member events are enabled
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-join_times = {}  # Track user join times
-
 # ✅ Bot Ready Event
 @bot.event
 async def on_ready():
     print(f"✅ {bot.user} is online!")
-
-# ✅ Track when users join
-@bot.event
-async def on_member_join(member):
-    join_times[member.id] = member.joined_at
-    print(f"🟢 {member} joined at {member.joined_at}")  # Debug log
 
 # ✅ Auto-ban users who leave before 30 days
 @bot.event
@@ -39,11 +31,18 @@ async def on_member_remove(member):
         print("⚠️ Missing 'Ban Members' permission.")
         return
 
-    if member.id not in join_times:
-        print(f"⚠️ {member} not found in join_times. Maybe the bot restarted?")
+    # ✅ Fetch the actual join date from Discord instead of relying on bot memory
+    try:
+        member = await guild.fetch_member(member.id)
+        time_joined = member.joined_at
+    except:
+        print(f"⚠️ Could not fetch {member.id}, assuming bot was offline when they joined.")
         return
 
-    time_joined = join_times[member.id]
+    if not time_joined:
+        print(f"⚠️ No join date available for {member}. Skipping...")
+        return
+
     days_in_server = (datetime.now(timezone.utc) - time_joined).days
     print(f"ℹ️ {member} was in the server for {days_in_server} days.")
 
@@ -52,7 +51,7 @@ async def on_member_remove(member):
             await guild.ban(member, reason="Left before 30 days")
             print(f"🚨 {member} was banned.")
 
-            # Send DM
+            # DM the banned user
             try:
                 embed_dm = discord.Embed(title="🚨 You Have Been Banned", color=discord.Color.red())
                 embed_dm.add_field(name="Reason", value="Left before 30 days", inline=False)
@@ -86,7 +85,7 @@ async def unban(ctx, user: discord.User):
         return
 
     try:
-        await guild.fetch_ban(user)
+        await guild.fetch_ban(user)  # Check if the user is banned
     except discord.NotFound:
         embed = discord.Embed(title="⚠️ User Not Banned", description=f"{user.mention} is **not banned**.", color=discord.Color.orange())
         await ctx.send(embed=embed)
