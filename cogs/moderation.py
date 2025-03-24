@@ -10,41 +10,39 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(administrator=True)
-    async def unban(self, ctx, user_id: int):
-        """Unbans a user by ID and logs the action."""
+    async def unban(self, ctx, user: discord.User):
+        """Unbans a user by mention or ID and logs the action."""
         guild = ctx.guild
         log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
 
         try:
-            user = await self.bot.fetch_user(user_id)
-            bans = await guild.bans()
-            banned_users = [ban_entry.user.id for ban_entry in bans]
+            async for ban_entry in guild.bans():
+                if ban_entry.user.id == user.id:
+                    await guild.unban(user)
 
-            if user.id not in banned_users:
-                embed = discord.Embed(title="⚠️ User Not Banned", description=f"{user.mention} is **not banned**.", color=discord.Color.orange())
-                await ctx.send(embed=embed)
-                return
+                    # ✅ DM User
+                    try:
+                        embed_dm = discord.Embed(title="✅ You Have Been Unbanned", color=discord.Color.green())
+                        embed_dm.add_field(name="Server", value=guild.name, inline=False)
+                        await user.send(embed=embed_dm)
+                    except:
+                        print(f"⚠️ Couldn't DM {user}.")
 
-            await guild.unban(user)
+                    # ✅ Log to Server
+                    if log_channel:
+                        embed_log = discord.Embed(title="✅ User Unbanned", color=discord.Color.green())
+                        embed_log.add_field(name="User", value=f"{user.mention} ({user.id})", inline=False)
+                        embed_log.add_field(name="Unbanned By", value=ctx.author.mention, inline=False)
+                        await log_channel.send(embed=embed_log)
 
-            # ✅ DM User
-            try:
-                embed_dm = discord.Embed(title="✅ You Have Been Unbanned", color=discord.Color.green())
-                embed_dm.add_field(name="Server", value=guild.name, inline=False)
-                await user.send(embed=embed_dm)
-            except:
-                print(f"⚠️ Couldn't DM {user}.")
+                    # ✅ Confirmation Message
+                    embed_success = discord.Embed(title="✅ Unban Successful", description=f"{user.mention} has been **unbanned**.", color=discord.Color.green())
+                    await ctx.send(embed=embed_success)
+                    return
 
-            # ✅ Log to Server
-            if log_channel:
-                embed_log = discord.Embed(title="✅ User Unbanned", color=discord.Color.green())
-                embed_log.add_field(name="User", value=f"{user.mention} ({user.id})", inline=False)
-                embed_log.add_field(name="Unbanned By", value=ctx.author.mention, inline=False)
-                await log_channel.send(embed=embed_log)
-
-            # ✅ Confirmation Message
-            embed_success = discord.Embed(title="✅ Unban Successful", description=f"{user.mention} has been **unbanned**.", color=discord.Color.green())
-            await ctx.send(embed=embed_success)
+            # If user was not found in ban list
+            embed_not_banned = discord.Embed(title="⚠️ User Not Banned", description=f"{user.mention} is **not banned**.", color=discord.Color.orange())
+            await ctx.send(embed=embed_not_banned)
 
         except discord.NotFound:
             await ctx.send(embed=discord.Embed(title="❌ Error", description="User **not found**. Check the ID.", color=discord.Color.red()))
