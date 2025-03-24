@@ -1,0 +1,13 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore environment variables (Railway handles this)
+.env
+
+# Ignore Firebase credentials (stored in Railway)
+firebase_credentials.json
+
+# Ignore virtual environments (if using venv)
+venv/
