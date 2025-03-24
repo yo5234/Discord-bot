@@ -6,7 +6,10 @@ from discord.ext import commands
 TOKEN = os.getenv("TOKEN")
 
 intents = discord.Intents.default()
-intents.members = True  
+intents.message_content = True  # Add this line
+intents.members = True  # Keep this as you had it
+
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
