@@ -8,7 +8,7 @@ class ModerationV2(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    @commands.has_permissions(moderate_members)
+    @commands.has_permissions(moderate_members=True)
     async def mute(self, ctx, member: discord.Member, *, reason="No reason provided"):
         """Assigns the mute role to a user"""
         mute_role = ctx.guild.get_role(MUTE_ROLE_ID)
@@ -25,7 +25,7 @@ class ModerationV2(commands.Cog):
             await ctx.send("⚠️ I couldn't mute this user!")
 
     @commands.command()
-    @commands.has_permissions(moderate_members)
+    @commands.has_permissions(moderate_members=True)
     async def unmute(self, ctx, member: discord.Member):
         """Removes the mute role from a user"""
         mute_role = ctx.guild.get_role(MUTE_ROLE_ID)
@@ -41,7 +41,7 @@ class ModerationV2(commands.Cog):
             await ctx.send("⚠️ I couldn't unmute this user!")
 
     @commands.command()
-    @commands.has_permissions(kick_members)
+    @commands.has_permissions(kick_members=True)
     async def kick(self, ctx, member: discord.Member, *, reason="No reason provided"):
         """Kicks a user from the server"""
         try:
@@ -54,7 +54,7 @@ class ModerationV2(commands.Cog):
             await ctx.send("⚠️ I couldn't kick this user!")
 
     @commands.command()
-    @commands.has_permissions(ban_members)
+    @commands.has_permissions(ban_members=True)
     async def ban(self, ctx, member: discord.Member, *, reason="No reason provided"):
         """Bans a user from the server"""
         try:
@@ -67,7 +67,7 @@ class ModerationV2(commands.Cog):
             await ctx.send("⚠️ I couldn't ban this user!")
 
     @commands.command()
-    @commands.has_permissions(manage_channels)
+    @commands.has_permissions(manage_channels=True)
     async def lock(self, ctx):
         """Locks the current channel"""
         try:
@@ -79,7 +79,7 @@ class ModerationV2(commands.Cog):
             await ctx.send("⚠️ I couldn't lock this channel!")
 
     @commands.command()
-    @commands.has_permissions(manage_channels)
+    @commands.has_permissions(manage_channels=True)
     async def unlock(self, ctx):
         """Unlocks the current channel"""
         try:
