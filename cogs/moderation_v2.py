@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import re
+from datetime import timedelta
 
 MUTE_ROLE_ID = 1346086817572585482  # Mute role ID directly set in code
 
@@ -119,7 +120,7 @@ class ModerationV2(commands.Cog):
         seconds = int(amount) * duration_mapping[unit]
 
         try:
-            await member.timeout(discord.utils.utcnow() + discord.timedelta(seconds=seconds), reason=reason)
+            await member.timeout(until=discord.utils.utcnow() + timedelta(seconds=seconds), reason=reason)
             
             embed = discord.Embed(title="⏳ User Timed Out", color=discord.Color.orange())
             embed.add_field(name="User", value=f"{member.mention} ({member.id})", inline=False)
