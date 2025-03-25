@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+import re
 
 MUTE_ROLE_ID = 1346086817572585482  # Mute role ID directly set in code
 
@@ -89,6 +90,44 @@ class ModerationV2(commands.Cog):
             await ctx.send(embed=embed)
         except:
             await ctx.send("⚠️ I couldn't unlock this channel!")
+
+    @commands.command()
+    @commands.has_permissions(moderate_members=True)
+    async def timeout(self, ctx, member: discord.Member = None, duration: str = None, *, reason="No reason provided"):
+        """Timeouts a user for a specified duration using formats like 60m, 2h, 3d, 1w, 1y"""
+        
+        if member is None:
+            return await ctx.send("⚠️ You must mention a user to timeout!")
+        
+        if duration is None:
+            return await ctx.send("⚠️ You must provide a duration (e.g., `60m`, `2h`, `3d`, `1w`, `1y`)!")
+
+        # Convert duration to seconds
+        duration_mapping = {
+            "m": 60,         # minutes
+            "h": 3600,       # hours
+            "d": 86400,      # days
+            "w": 604800,     # weeks
+            "y": 31536000    # years
+        }
+        
+        match = re.match(r"^(\d+)([mhdwy])$", duration)
+        if not match:
+            return await ctx.send("⚠️ Invalid duration format! Use `60m`, `2h`, `3d`, `1w`, `1y`.")
+
+        amount, unit = match.groups()
+        seconds = int(amount) * duration_mapping[unit]
+
+        try:
+            await member.timeout(discord.utils.utcnow() + discord.timedelta(seconds=seconds), reason=reason)
+            
+            embed = discord.Embed(title="⏳ User Timed Out", color=discord.Color.orange())
+            embed.add_field(name="User", value=f"{member.mention} ({member.id})", inline=False)
+            embed.add_field(name="Duration", value=f"{amount} {unit}", inline=False)
+            embed.add_field(name="Reason", value=reason, inline=False)
+            await ctx.send(embed=embed)
+        except Exception as e:
+            await ctx.send(f"⚠️ I couldn't timeout this user! Error: `{e}`")
 
 async def setup(bot):
     await bot.add_cog(ModerationV2(bot))
