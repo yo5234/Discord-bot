@@ -18,6 +18,7 @@ async def load_cogs():
     await bot.load_extension("events.on_member_remove")
     await bot.load_extension("cogs.moderation")
     await bot.load_extension("cogs.staff_application")
+    await bot.load_extension("cogs.moderation_v2")
 
 @bot.event
 async def on_ready():
