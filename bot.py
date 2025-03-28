@@ -19,7 +19,7 @@ async def load_cogs():
     await bot.load_extension("cogs.moderation")
     await bot.load_extension("cogs.staff_application")
     await bot.load_extension("cogs.moderation_v2")
-
+    await bot.load_extension("cogs.auto_giveaway_payout")
 @bot.event
 async def on_ready():
     print(f"✅ {bot.user} is online!")
