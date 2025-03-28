@@ -1,33 +1,44 @@
-import discord from discord.ext import commands import re
+import discord from discord.ext import commands from discord.ui import Button, View
 
 class AutoGiveawayPayout(commands.Cog): def init(self, bot): self.bot = bot
 
 @commands.Cog.listener()
-async def on_message(self, message):
-    # Check if the message is from the Element bot and contains a giveaway result
-    if message.author.id == 957635842631950379 and "GIVEAWAY ENDED" in message.content:
-        winners = re.findall(r'@\S+', message.content)
-        prize_match = re.search(r'(\d+[mkb])', message.content, re.IGNORECASE)
+async def on_giveaway_end(self, giveaway):
+    payout_channel_id = 1351971819682271332
+    payout_channel = self.bot.get_channel(payout_channel_id)
+    
+    if payout_channel:
+        winners = giveaway['winners']
+        prize = giveaway['prize']
+        divided_prize = prize / len(winners) if winners else prize
         
-        if winners and prize_match:
-            prize = prize_match.group(1)
-            total_winners = len(winners)
-            divided_prize = f"{int(prize[:-1]) // total_winners}{prize[-1]}" if total_winners > 0 else prize
-            
-            embed = discord.Embed(title="Payout Queued", color=discord.Color.gold())
-            embed.add_field(name="Winners", value=', '.join(winners), inline=False)
-            embed.add_field(name="Prize", value=f"Each gets: {divided_prize}", inline=False)
-            
-            view = discord.ui.View()
-            button = discord.ui.Button(label="Queue", style=discord.ButtonStyle.green, custom_id="queue_giveaway")
-            view.add_item(button)
-            
-            await message.channel.send(embed=embed, view=view)
+        winners_mention = ', '.join([f"<@{winner}>" for winner in winners])
+        embed = discord.Embed(
+            title="Giveaway Ended!",
+            description=f"Prize: {prize} (Each winner gets {divided_prize})\nWinners: {winners_mention}",
+            color=discord.Color.green()
+        )
+        
+        button = Button(label="Queue this?", style=discord.ButtonStyle.primary)
+        
+        async def button_callback(interaction: discord.Interaction):
+            await interaction.response.send_message("Queued successfully!", ephemeral=True)
+        
+        button.callback = button_callback
+        
+        view = View()
+        view.add_item(button)
+        
+        await payout_channel.send(embed=embed, view=view)
 
 @commands.Cog.listener()
-async def on_interaction(self, interaction: discord.Interaction):
-    if interaction.data and interaction.data.get("custom_id") == "queue_giveaway":
-        await interaction.response.send_message("Giveaway queued successfully!", ephemeral=True)
+async def on_message(self, message):
+    if message.author.id == 957635842631950379 and message.channel.id == 1351971819682271332:
+        await message.delete()
+        # Fetch latest giveaway results and resend the updated message
+        # (Assume we have a method to get latest results)
+        latest_giveaway = self.get_latest_giveaway()
+        await self.on_giveaway_end(latest_giveaway)
 
 async def setup(bot): await bot.add_cog(AutoGiveawayPayout(bot))
 
